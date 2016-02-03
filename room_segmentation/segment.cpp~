@@ -1,0 +1,8 @@
+
+
+int main(int argc, char** argv) {
+  if (argc < 2) {
+    printf("Usage: segment fname\n  fname: input ply in ascii format");
+    return 1;
+  }
+}
