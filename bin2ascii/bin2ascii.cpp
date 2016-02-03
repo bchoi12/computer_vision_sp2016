@@ -32,7 +32,7 @@ std::map<std::string, char> sizes = initSizes();
 
 int main(int argc, char** argv) {
   if (argc < 2) {
-    printf("Usage: bin2ascii fname\n  fname: input ply in binary format");
+    printf("Usage: bin2ascii fname\n  fname: input ply in binary big endian format");
     return 1;
   }
 
@@ -59,8 +59,7 @@ int main(int argc, char** argv) {
     ofs << "ply" << std::endl << "format " << ASCII_FORMAT << std::endl;
     
     std::vector<std::string> vertexProperties, faceProperties, edgeProperties;
-    unsigned int vertices = 0, faces = 0, edges = 0;
-    int state = 0;
+    unsigned int vertices = 0, faces = 0, edges = 0, state = 0;
 
     // read header lines
     do {
@@ -95,12 +94,15 @@ int main(int argc, char** argv) {
     }
     while(line != END_HEADER);
 
+    // convert binary data and write to output file
     for(unsigned int i=0; i<vertices; i++) {
       writeASCII(ifs, ofs, vertexProperties);
     }
-
     for(unsigned int i=0; i<faces; i++) {
       writeASCII(ifs, ofs, faceProperties);
+    }
+    for(unsigned int i=0; i<edges; i++) {
+      writeASCII(ifs, ofs, edgeProperties);
     }
   }
 
@@ -110,6 +112,7 @@ int main(int argc, char** argv) {
   return 0;
 }
 
+// split a string by whitespace
 void split(const std::string &s, std::vector<std::string> &elems) {
   std::stringstream ss(s);
   std::string item;
@@ -118,6 +121,7 @@ void split(const std::string &s, std::vector<std::string> &elems) {
   }
 }
 
+// writes a line based on property types
 void writeASCII(std::ifstream &ifs, std::ofstream &ofs, std::vector<std::string> &properties) {
   if (properties.size() == 0) {
     return;
@@ -146,6 +150,7 @@ void writeASCII(std::ifstream &ifs, std::ofstream &ofs, std::vector<std::string>
   ofs << std::endl;
 }
 
+// writes a single property to the output stream 
 void writeProperty(std::ifstream &ifs, std::ofstream &ofs, std::string &type, unsigned int &output) {
 
   unsigned int size = sizes[type];
