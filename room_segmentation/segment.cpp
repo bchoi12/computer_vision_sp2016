@@ -8,9 +8,16 @@
 #define DEBUG 1
 #define END_HEADER "end_header"
 
+#define MASK_SIZE 200
+#define WALL_THRESH 0.25
+
 void split(const std::string &s, std::vector<std::string> &elems);
-void computeDensity(std::vector< std::vector<int> > &density, std::vector<float> &vx, std::vector<float> &vy, float &xmin, float &xmax, float &ymin, float &ymax);
-void densityMap(std::vector< std::vector<int> > &density, int &maxDensity, std::string outputName);
+void computeDensity(std::vector< std::vector<int> > &density, std::vector<float> &vx, std::vector<float> &vy, float xmin, float xmax, float ymin, float ymax);
+void findWalls(std::vector< std::vector<int> > &density, std::vector< std::vector<bool> > &walls, std::vector< std::vector<bool> > &freeSpace, int maxDensity, float threshold = WALL_THRESH);
+void densityMap(std::vector< std::vector<int> > &density, int maxDensity, std::string outputName);
+void wallMap(std::vector< std::vector<bool> > &density, std::string outputName);
+void coord2index(float x, float y, float xmin, float xmax, float ymin, float ymax, unsigned int width, unsigned int height, int &xindex, int &yindex);
+void index2coord(int xindex, int yindex, float xmin, floatxmax, float ymin, float ymax, unsigned int width, unsigned int height, float &x, float &y);
 
 int main(int argc, char** argv) {
   if (argc < 2) {
@@ -79,7 +86,7 @@ int main(int argc, char** argv) {
     }
 
     // hardcoded mask size for now
-    const int maskSize = 100;
+    const int maskSize = MASK_SIZE;
 
     std::vector< std::vector<int> > density;
     density.resize(maskSize);
@@ -88,7 +95,6 @@ int main(int argc, char** argv) {
     }
 
     computeDensity(density, vx, vy, xmin, xmax, ymin, ymax);
-    
   }
 
   ifs.close();
@@ -104,12 +110,12 @@ void split(const std::string &s, std::vector<std::string> &elems) {
   }
 }
 
-void computeDensity(std::vector< std::vector<int> > &density, std::vector<float> &vx, std::vector<float> &vy, float &xmin, float &xmax, float &ymin, float &ymax) {
+void computeDensity(std::vector< std::vector<int> > &density, std::vector<float> &vx, std::vector<float> &vy, float xmin, float xmax, float ymin, float ymax) {
 
   int maxDensity = 0;
   for(unsigned int i=0; i<vx.size(); ++i) {
-    int xindex = std::min((int) ((vx[i] - xmin) / (xmax - xmin) * density.size()), (int) density.size()-1);
-    int yindex = std::min((int) ((vy[i] - ymin) / (ymax - ymin) * density[0].size()), (int) density[0].size()-1);
+    int xindex, yindex;
+    coord2index(vx[i], vy[i], xmin, xmax, ymin, ymax, density.size(), density[0].size(), xindex, yindex);
 
     density[yindex][xindex]++;
     maxDensity = std::max(density[yindex][xindex], maxDensity);
@@ -123,9 +129,57 @@ void computeDensity(std::vector< std::vector<int> > &density, std::vector<float>
   if (DEBUG) {
     printf("Wrote density map image density_map.ppm\n");
   }
+
+  std::vector< std::vector<bool> > walls, freeSpace;
+  findWalls(density, walls, freeSpace,  maxDensity);
+  wallMap(walls, "wall_map");
+  wallMap(freeSpace, "free_map");
+  if (DEBUG) {
+    printf("Wrote wall map image wall_map.ppm\n");
+    printf("Wrote free space map image free_map.ppm\n");
+  }
 }
 
-void densityMap(std::vector< std::vector<int> > &density, int &maxDensity,  std::string outputName) {
+void findWalls(std::vector< std::vector<int> > &density, std::vector< std::vector<bool> > &walls, std::vector< std::vector<bool> > &freeSpace, int maxDensity, float threshold) {
+  walls.resize(density.size());
+  freeSpace.resize(density.size());
+  for(unsigned int i=0; i<walls.size(); ++i) {
+    walls[i].resize(density[i].size());
+    freeSpace[i].resize(density[i].size());
+  }
+
+  for(unsigned int i=0; i<walls.size(); ++i) {
+    for(unsigned int j=0; j<walls[i].size(); ++j) {
+      walls[i][j] = density[i][j] > threshold * maxDensity;
+      freeSpace[i][j] = density[i][j] == 0 ? false : !walls[i][j];
+    }
+  }
+
+  /*
+  // refine free space
+  const int rad = 1;
+  for(unsigned int i=0; i<freeSpace.size(); ++i) {
+    for(unsigned int j=0; j<freeSpace.size(); ++j) {
+      if (!freeSpace[i][j]) {
+	continue;
+      }
+
+      for(int x=-rad; x<=rad; ++x) {
+	for(int y=-rad; y<=rad; ++y) {
+	  int xindex = std::max(0, std::min((int) freeSpace.size()-1, (int) i+x));
+	  int yindex = std::max(0, std::min((int) freeSpace.size()-1, (int) j+y));
+	  if (walls[xindex][yindex]) {
+	    freeSpace[i][j] = false;
+	    continue;
+	  }
+	}
+      }
+    }
+  }
+  */
+}
+
+void densityMap(std::vector< std::vector<int> > &density, int maxDensity,  std::string outputName) {
   const unsigned int width = density.size(), height = density[0].size();
 
   FILE *fp = fopen((outputName + ".ppm").c_str(), "wb");
@@ -141,4 +195,32 @@ void densityMap(std::vector< std::vector<int> > &density, int &maxDensity,  std:
   }
 
   fclose(fp);
+}
+
+void wallMap(std::vector< std::vector<bool> > &density, std::string outputName) {
+  const unsigned int width = density.size(), height = density[0].size();
+
+  FILE *fp = fopen((outputName + ".ppm").c_str(), "wb");
+  fprintf(fp, "P6\n%d %d\n255\n", width, height);
+  for(unsigned int j=0; j<height; ++j) {
+    for(unsigned int i=0; i<width; ++i) {
+      static unsigned char color[3];
+      color[0] = density[j][i] ? 255 : 0;
+      color[1] = color[0];
+      color[2] = color[0];
+      fwrite(color, 1, 3, fp);
+    }
+  }
+
+  fclose(fp);
+}
+
+void coord2index(float x, float y, float xmin, float xmax, float ymin, float ymax, unsigned int width, unsigned int height, int &xindex, int &yindex) {
+    xindex = std::min((int) ((x - xmin) / (xmax - xmin) * width), (int) width-1);
+    yindex = std::min((int) ((y - ymin) / (ymax - ymin) * height), (int) height-1);
+}
+
+void index2coord(int xindex, int yindex, float xmin, float xmax, float ymin, float ymax, unsigned int width, unsigned int height, float &x, float &y) {
+  x = xmin + xindex * (xmax - xmin) / width;
+  y = ymin + yindex * (ymax - ymin) / height;
 }
