@@ -15,9 +15,14 @@ void split(const std::string &s, std::vector<std::string> &elems);
 void computeDensity(std::vector< std::vector<int> > &density, std::vector<float> &vx, std::vector<float> &vy, float xmin, float xmax, float ymin, float ymax);
 void findWalls(std::vector< std::vector<int> > &density, std::vector< std::vector<bool> > &walls, std::vector< std::vector<bool> > &freeSpace, int maxDensity, float threshold = WALL_THRESH);
 void densityMap(std::vector< std::vector<int> > &density, int maxDensity, std::string outputName);
-void wallMap(std::vector< std::vector<bool> > &density, std::string outputName);
+void binaryMap(std::vector< std::vector<bool> > &density, std::string outputName);
 void coord2index(float x, float y, float xmin, float xmax, float ymin, float ymax, unsigned int width, unsigned int height, int &xindex, int &yindex);
-void index2coord(int xindex, int yindex, float xmin, floatxmax, float ymin, float ymax, unsigned int width, unsigned int height, float &x, float &y);
+void index2coord(int xindex, int yindex, float xmin, float xmax, float ymin, float ymax, unsigned int width, unsigned int height, float &x, float &y);
+
+void dilate(std::vector< std::vector<bool> > &mask, std::vector< std::vector<bool> > &kernel);
+void erode(std::vector< std::vector<bool> > &mask, std::vector< std::vector<bool> > &kernel);
+void open(std::vector< std::vector<bool> > &mask, std::vector< std::vector<bool> > &kernel);
+void close(std::vector< std::vector<bool> > &mask, std::vector< std::vector<bool> > &kernel);
 
 int main(int argc, char** argv) {
   if (argc < 2) {
@@ -132,12 +137,25 @@ void computeDensity(std::vector< std::vector<int> > &density, std::vector<float>
 
   std::vector< std::vector<bool> > walls, freeSpace;
   findWalls(density, walls, freeSpace,  maxDensity);
-  wallMap(walls, "wall_map");
-  wallMap(freeSpace, "free_map");
+  binaryMap(walls, "wall_map");
+  binaryMap(freeSpace, "free_map");
   if (DEBUG) {
     printf("Wrote wall map image wall_map.ppm\n");
     printf("Wrote free space map image free_map.ppm\n");
   }
+
+  std::vector<bool> top, mid, bot;
+  top.push_back(0); top.push_back(1); top.push_back(0);
+  mid.push_back(1); mid.push_back(0); mid.push_back(1);
+  bot.push_back(0); bot.push_back(1); bot.push_back(0);
+  std::vector< std::vector<bool> > kernel;
+  kernel.push_back(top); kernel.push_back(mid); kernel.push_back(bot);
+
+  open(freeSpace, kernel);
+  binaryMap(freeSpace, "open_free_map");
+  
+  close(walls, kernel);
+  binaryMap(walls, "close_wall_map");
 }
 
 void findWalls(std::vector< std::vector<int> > &density, std::vector< std::vector<bool> > &walls, std::vector< std::vector<bool> > &freeSpace, int maxDensity, float threshold) {
@@ -154,7 +172,7 @@ void findWalls(std::vector< std::vector<int> > &density, std::vector< std::vecto
       freeSpace[i][j] = density[i][j] == 0 ? false : !walls[i][j];
     }
   }
-
+  
   /*
   // refine free space
   const int rad = 1;
@@ -197,7 +215,7 @@ void densityMap(std::vector< std::vector<int> > &density, int maxDensity,  std::
   fclose(fp);
 }
 
-void wallMap(std::vector< std::vector<bool> > &density, std::string outputName) {
+void binaryMap(std::vector< std::vector<bool> > &density, std::string outputName) {
   const unsigned int width = density.size(), height = density[0].size();
 
   FILE *fp = fopen((outputName + ".ppm").c_str(), "wb");
@@ -223,4 +241,94 @@ void coord2index(float x, float y, float xmin, float xmax, float ymin, float yma
 void index2coord(int xindex, int yindex, float xmin, float xmax, float ymin, float ymax, unsigned int width, unsigned int height, float &x, float &y) {
   x = xmin + xindex * (xmax - xmin) / width;
   y = ymin + yindex * (ymax - ymin) / height;
+}
+
+void dilate(std::vector< std::vector<bool> > &mask, std::vector< std::vector<bool> > &kernel) {
+
+  int kernelSum = 0;
+  for(unsigned int i=0; i<kernel.size(); ++i) {
+    for(unsigned int j=0; j<kernel.size(); ++j) {
+      if (kernel[i][j]) {
+	kernelSum++;
+      }
+    }
+  }
+  
+  std::vector< std::vector<bool> > copy;
+  copy.resize(mask.size());
+  for(unsigned int i=0; i<mask.size(); ++i) {
+    copy[i].resize(mask[i].size());
+    for(unsigned int j=0; j<mask[i].size(); ++j) {
+      copy[i][j] = mask[i][j];
+      if (mask[i][j]) {
+	continue;
+      }
+      int count = 0;
+      for(unsigned int x=0; x<kernel.size(); ++x) {
+	for(unsigned int y=0; y<kernel[x].size(); ++y) {
+	  if (!kernel[x][y]) {
+	    continue;
+	  }
+	  
+	  int xindex = std::max(0, std::min((int) mask.size()-1, (int) (i+x-kernel.size()/2)));
+	  int yindex = std::max(0, std::min((int) mask[i].size()-1, (int) (j+y-kernel.size()/2)));
+	  if (mask[xindex][yindex]) {
+	    count++;
+	  }
+	}
+      }
+      copy[i][j] = count >= kernelSum/2;
+    }
+  }
+  mask = copy;
+}
+
+void erode(std::vector< std::vector<bool> > &mask, std::vector< std::vector<bool> > &kernel) {
+
+  int kernelSum = 0;
+  for(unsigned int i=0; i<kernel.size(); ++i) {
+    for(unsigned int j=0; j<kernel.size(); ++j) {
+      if (kernel[i][j]) {
+	kernelSum++;
+      }
+    }
+  }
+  
+  std::vector< std::vector<bool> > copy;
+  copy.resize(mask.size());
+  for(unsigned int i=0; i<mask.size(); ++i) {
+    copy[i].resize(mask[i].size());
+    for(unsigned int j=0; j<mask[i].size(); ++j) {
+      copy[i][j] = mask[i][j];
+      if (!mask[i][j]) {
+	continue;
+      }
+      int count = 0;
+      for(unsigned int x=0; x<kernel.size(); ++x) {
+	for(unsigned int y=0; y<kernel[x].size(); ++y) {
+	  if (!kernel[x][y]) {
+	    continue;
+	  }
+	  
+	  int xindex = std::max(0, std::min((int) mask.size()-1, (int) (i+x-kernel.size()/2)));
+	  int yindex = std::max(0, std::min((int) mask[i].size()-1, (int) (j+y-kernel.size()/2)));
+	  if (!mask[xindex][yindex]) {
+	    count++;
+	  }
+	}
+      }
+      copy[i][j] = !(count >= kernelSum/2);
+    }
+  }
+  mask = copy;
+}
+
+void open(std::vector< std::vector<bool> > &mask, std::vector< std::vector<bool> > &kernel) {
+  erode(mask, kernel);
+  dilate(mask, kernel);
+}
+
+void close(std::vector< std::vector<bool> > &mask, std::vector< std::vector<bool> > &kernel) {
+  dilate(mask, kernel);
+  erode(mask, kernel);
 }
