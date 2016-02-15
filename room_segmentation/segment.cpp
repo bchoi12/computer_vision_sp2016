@@ -132,11 +132,29 @@ void Segment::index2coord(int xindex, int yindex, float &x, float &y) {
   y = ymin + yindex * (ymax - ymin) / height;
 }
   
-void Segment::subsample(int sampleSize, std::vector<int> &indices) {
-  // implement
-}
-void Segment::subsample(float sampleSize, std::vector<int> &indices) {
-  // implement
+void Segment::subsample(int stepsize) {
+  freeIndices.clear();
+  wallIndices.clear();
+  
+  for(unsigned int i=0; i<vx.size(); i+=stepsize) {
+    int xindex, yindex;
+    coord2index(vx[i], vy[i], xindex, yindex);
+
+    if (walls[xindex][yindex]) {
+      wallIndices.push_back(xindex);
+      wallIndices.push_back(yindex);
+    } else if (freeSpace[xindex][yindex]) {
+
+      // filter points close to wall?
+      
+      freeIndices.push_back(xindex);
+      freeIndices.push_back(yindex);
+    }
+  }
+
+  if (DEBUG) {
+    printf("Subsampled %d free space points and %d wall points\n", (int) freeIndices.size()/2, (int) wallIndices.size()/2);
+  }
 }
   
 void Segment::dilate(std::vector< std::vector<bool> > &mask) {
@@ -221,6 +239,42 @@ void Segment::setKernel(std::vector< std::vector<bool> > &kernel) {
   }
 }
 
+void Segment::computeVisibility() {
+  if (DEBUG) {
+    printf("Computing %d-dimension visibility vectors for %d free space points...\n", (int) wallIndices.size()/2, (int) freeIndices.size()/2);
+  }
+  
+  visibilityVectors.clear();
+  visibilityVectors.resize(freeIndices.size()/2);
+  for(unsigned int i=0; i<freeIndices.size(); i+=2) {
+    int fx = freeIndices[i];
+    int fy = freeIndices[i+1];
+
+    visibilityVectors[i/2].resize(wallIndices.size()/2);
+    for(unsigned int j=0; j<wallIndices.size(); j+=2) {
+      int wx = wallIndices[j];
+      int wy = wallIndices[j+1];
+
+      visibilityVectors[i/2][j/2] = visible(fx, fy, wx, wy) ? 1.0 : 0;
+    }
+  }
+
+  if (DEBUG) {
+    printf("Visibility computations finished\n");
+  }
+}
+
+void Segment::testVisibility() {
+  int fx = freeIndices[1000];
+  int fy = freeIndices[1001];
+
+  for(unsigned int i=0; i<20; ++i) {
+    int wx = wallIndices[2*i];
+    int wy = wallIndices[2*i+1];
+    printf("%d, %d -> %d, %d = %d\n", fx, fy, wx, wy, visible(fx, fy, wx, wy));
+  }
+}
+
 void Segment::split(const std::string &s, std::vector<std::string> &elems) {
   elems.clear();
   std::stringstream ss(s);
@@ -283,4 +337,58 @@ void Segment::readFile() {
     }
   }
   ifs.close();
+}
+
+bool Segment::visible(int xstart, int ystart, int xend, int yend, int buffer) {
+  bool vis = true;
+  bool vert = false;
+  if (abs(yend - ystart) > abs(xstart - xend)) {
+    vert = true;
+    swap(xstart, ystart);
+    swap(xend, yend);
+  }
+
+  if (xstart > xend) {
+    swap(xstart, xend);
+    swap(ystart, yend);
+  }
+
+  for(int i=xstart+buffer; i<=xend-buffer; ++i) {
+    int j = ystart + (i - xstart) * abs(yend-ystart) / (xend - xstart);
+
+    if (vert) {
+      if (walls[j][i]) {
+	vis = false;
+	break;
+      }
+    } else {
+      if (walls[i][j]) {
+	vis = false;
+	break;
+      }
+    }
+  }
+
+  return vis;
+}
+
+void Segment::swap(int &one, int &two) {
+  one = one ^ two;
+  two = one ^ two;
+  one = one ^ two;
+}
+
+void Segment::normalize(std::vector<float> &v) {
+  float sum = 0;
+  for(unsigned int i=0; i<v.size(); ++i) {
+    sum += v[i];
+  }
+
+  if (sum == 0 || sum == 1) {
+    return;
+  }
+
+  for(unsigned int i=0; i<v.size(); ++i) {
+    v[i] = v[i] / sum;
+  }
 }

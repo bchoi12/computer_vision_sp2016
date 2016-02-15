@@ -31,6 +31,9 @@ int main(int argc, char** argv) {
     segment.binaryMap(segment.walls, "opened_wall_map");
   }
 
+  segment.subsample();
+  segment.computeVisibility();
+
   printf("Finished running segmentation\n");
   
 }

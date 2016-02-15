@@ -7,13 +7,17 @@
 #define END_HEADER "end_header"
 #define MASK_WIDTH 200
 #define WALL_THRESH 0.25
+#define SUBSAMPLE_STEP 100
+#define VISIBILITY_BUFFER 2
 
 #define DEBUG 1
 
 class Segment {
  public:
+  std::vector<int> wallIndices, freeIndices;
   std::vector< std::vector<int> > density;
-  std::vector< std::vector<bool> > walls, freeSpace; 
+  std::vector< std::vector<bool> > walls, freeSpace;
+  std::vector< std::vector<float> > visibilityVectors;
   std::vector<float> vx, vy, vz;
   unsigned int vertices, faces, edges;
   unsigned int width, height; // mask width, height
@@ -29,14 +33,16 @@ class Segment {
   void coord2index(float x, float y, int &xindex, int &yindex);
   void index2coord(int xindex, int yindex, float &x, float &y);
   
-  void subsample(int sampleSize, std::vector<int> &indices);
-  void subsample(float sampleSize, std::vector<int> &indices);
+  void subsample(int stepsize = SUBSAMPLE_STEP);
   
   void dilate(std::vector< std::vector<bool> > &mask);
   void erode(std::vector< std::vector<bool> > &mask);
   void open(std::vector< std::vector<bool> > &mask);
   void close(std::vector< std::vector<bool> > &mask);
   void setKernel(std::vector< std::vector<bool> > &kernel);
+
+  void computeVisibility();
+  void testVisibility();
   
  private:
   char * filename;
@@ -46,6 +52,9 @@ class Segment {
   
   void split(const std::string &s, std::vector<std::string> &elems);
   void readFile();
+  bool visible(int xstart, int ystart, int xend, int yend, int buffer=VISIBILITY_BUFFER);
+  void swap(int &one, int &two);
+  void normalize(std::vector<float> &v);
 };
 
 #endif
