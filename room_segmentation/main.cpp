@@ -1,10 +1,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <sstream>
+#include <string>
+
 #include "segment.h"
 
 #define OPEN_FREESPACE 1
 #define CLOSE_WALLS 1
+#define TEST_VISIBILITY 0
+
+void test(Segment &segment, int start, int end);
 
 int main(int argc, char** argv) {
   if (argc < 2) {
@@ -28,12 +34,29 @@ int main(int argc, char** argv) {
 
   if (CLOSE_WALLS) {
     segment.close(segment.walls);
-    segment.binaryMap(segment.walls, "opened_wall_map");
+    segment.binaryMap(segment.walls, "closed_wall_map");
   }
 
   segment.subsample();
-  segment.computeVisibility();
 
+  if (TEST_VISIBILITY) {
+    test(segment, 200, 202);
+    test(segment, 350, 352);
+    test(segment, 510, 525);
+  }
+  
+  segment.computeFreeSpaceVisibility();
+  segment.clustering();
+  
   printf("Finished running segmentation\n");
   
+}
+
+// careful may throw out of bounds
+void test(Segment &segment, int start, int end) {
+  for(int i=start; i<=end; i++) {
+    std::ostringstream cc;
+    cc << "test_map" << i;
+    segment.testVisibility(i, cc.str());
+  }
 }

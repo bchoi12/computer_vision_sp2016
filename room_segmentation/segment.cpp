@@ -2,7 +2,10 @@
 
 #include "segment.h"
 #include <stdlib.h>
+
+#include <algorithm>
 #include <fstream>
+#include <map>
 #include <sstream>
 
 Segment::Segment(char* filename, unsigned int width) {
@@ -24,9 +27,13 @@ Segment::Segment(char* filename, unsigned int width) {
 
   density.resize(height);
   for(unsigned int i=0; i<density.size(); ++i) {
-    density[i].resize(height);
+    density[i].resize(width);
   }
   maxDensity = 0;
+
+  if (DEBUG) {
+    printf("Mask width: %d; mask height: %d\n", width, height);
+  }
 }
 
 void Segment::computeDensity() {
@@ -67,14 +74,14 @@ void Segment::findWalls(float threshold) {
 void Segment::densityMap(std::vector< std::vector<int> > &map, std::string outputName) {
   const unsigned int mapHeight = map.size(); const unsigned int mapWidth = map[0].size();
 
-  int mapMax;
+  if (mapWidth == 0 || mapHeight == 0) {
+    return;
+  }
+
+  int mapMax = map[0][0];
   for(unsigned int i=0; i<mapWidth; ++i) {
     for(unsigned int j=0; j<mapHeight; ++j) {
-      if (i == 0 && j == 0) {
-	mapMax = map[i][j];
-      } else {
-	mapMax = std::max(mapMax, map[i][j]);
-      }
+      mapMax = std::max(mapMax, map[i][j]);
     }
   }
 
@@ -135,25 +142,47 @@ void Segment::index2coord(int xindex, int yindex, float &x, float &y) {
 void Segment::subsample(int stepsize) {
   freeIndices.clear();
   wallIndices.clear();
-  
+  /*
   for(unsigned int i=0; i<vx.size(); i+=stepsize) {
     int xindex, yindex;
     coord2index(vx[i], vy[i], xindex, yindex);
 
+    std::pair<int, int> indices(xindex, yindex);
     if (walls[xindex][yindex]) {
-      wallIndices.push_back(xindex);
-      wallIndices.push_back(yindex);
+      wallIndices.push_back(indices);
     } else if (freeSpace[xindex][yindex]) {
+      //freeIndices.push_back(indices);
+    }
+  }
+  */
 
-      // filter points close to wall?
-      
-      freeIndices.push_back(xindex);
-      freeIndices.push_back(yindex);
+  /*
+  for(unsigned int i=0; i<walls.size(); ++i) {
+    for(unsigned int j=0; j<walls[i].size(); ++j) {
+      if (walls[i][j]) {
+	std::pair<int, int> indices(i, j);
+	wallIndices.push_back(indices);
+      }
+    }
+  }
+  */
+
+  for(unsigned int i=0; i<walls.size(); i+=stepsize) {
+    for(unsigned int j=0; j<walls[i].size(); j+=stepsize) {
+      std::pair<int, int> indices(i, j);
+      if (walls[i][j]) {
+	wallIndices.push_back(indices);
+      } else if (freeSpace[i][j]) {
+
+	// filter points close to wall?
+	
+	freeIndices.push_back(indices);
+      }
     }
   }
 
   if (DEBUG) {
-    printf("Subsampled %d free space points and %d wall points\n", (int) freeIndices.size()/2, (int) wallIndices.size()/2);
+    printf("Subsampled %d free space points and %d wall points\n", (int) freeIndices.size(), (int) wallIndices.size());
   }
 }
   
@@ -239,24 +268,18 @@ void Segment::setKernel(std::vector< std::vector<bool> > &kernel) {
   }
 }
 
-void Segment::computeVisibility() {
+void Segment::computeFreeSpaceVisibility() {
   if (DEBUG) {
-    printf("Computing %d-dimension visibility vectors for %d free space points...\n", (int) wallIndices.size()/2, (int) freeIndices.size()/2);
+    printf("Computing %d-dimension visibility vectors for %d free space points...\n", (int) wallIndices.size(), (int) freeIndices.size());
   }
   
   visibilityVectors.clear();
-  visibilityVectors.resize(freeIndices.size()/2);
-  for(unsigned int i=0; i<freeIndices.size(); i+=2) {
-    int fx = freeIndices[i];
-    int fy = freeIndices[i+1];
+  visibilityVectors.resize(freeIndices.size());
+  for(unsigned int i=0; i<freeIndices.size(); ++i) {
+    int fx = freeIndices[i].first;
+    int fy = freeIndices[i].second;
 
-    visibilityVectors[i/2].resize(wallIndices.size()/2);
-    for(unsigned int j=0; j<wallIndices.size(); j+=2) {
-      int wx = wallIndices[j];
-      int wy = wallIndices[j+1];
-
-      visibilityVectors[i/2][j/2] = visible(fx, fy, wx, wy) ? 1.0 : 0;
-    }
+    computeVisibility(fx, fy, visibilityVectors[i]);
   }
 
   if (DEBUG) {
@@ -264,15 +287,127 @@ void Segment::computeVisibility() {
   }
 }
 
-void Segment::testVisibility() {
-  int fx = freeIndices[1000];
-  int fy = freeIndices[1001];
-
-  for(unsigned int i=0; i<20; ++i) {
-    int wx = wallIndices[2*i];
-    int wy = wallIndices[2*i+1];
-    printf("%d, %d -> %d, %d = %d\n", fx, fy, wx, wy, visible(fx, fy, wx, wy));
+void Segment::computeVisibility(int fx, int fy, std::vector<float> &out) {
+  out.resize(wallIndices.size());
+  for(unsigned int i=0; i<wallIndices.size(); ++i) {
+    int wx = wallIndices[i].first;
+    int wy = wallIndices[i].second;
+    out[i] = visible(fx, fy, wx, wy) ? 1 : 0;
   }
+  normalize(out);
+}
+
+// do not use, test method
+void Segment::testVisibility(int testIndex, std::string output) {
+  int fx = freeIndices[testIndex].first;
+  int fy = freeIndices[testIndex].second;
+  printf("Testing coord %d, %d\n", fx, fy);
+  
+  std::vector< std::vector<bool> > mask;
+  mask.resize(height);
+  for(unsigned int i=0; i<mask.size(); ++i) {
+    mask[i].resize(width);
+  }
+  
+  for(unsigned int i=0; i<wallIndices.size(); ++i) {
+    int wx = wallIndices[i].first;
+    int wy = wallIndices[i].second;
+    //printf("%d, %d -> %d, %d = %d\n", fx, fy, wx, wy, visible(fx, fy, wx, wy));
+    mask[wx][wy]  = visible(fx, fy, wx, wy);
+  }
+
+  // CAREFUL
+  mask[fx][fy] = true;
+  mask[fx+1][fy] = true;
+  mask[fx-1][fy] = true;
+  mask[fx][fy+1] = true;
+  mask[fx][fy-1] = true;
+
+  binaryMap(mask, output);
+}
+
+void Segment::clustering(int clusters) {
+  clusters = std::max(clusters, (int) freeIndices.size());
+
+  // pick random vertices to be initial cluster centers
+  std::vector<int> indices(freeIndices.size());
+  for(unsigned int i=0; i<freeIndices.size(); ++i) {
+    indices[i] = i;
+  }
+  std::random_shuffle(indices.begin(), indices.end());
+
+  // vector of each cluster center's mask coordinates
+  std::vector<std::pair<int, int> > centers(clusters);
+  for(unsigned int i=0; i<clusters; ++i) {
+    centers[i] = freeIndices[indices[i]]; 
+  }
+
+  // map of cluster center to vector of cluster's members 
+  std::map<int, std::vector<int> > clusterMembers;
+  for(unsigned int i=0; i<clusters; ++i) {
+    std::vector<int> v;
+    v.push_back(indices[i]);
+    clusterMembers[i] = v;
+  }
+
+  // vector of cluster center visibility vectors
+  std::vector< std::vector<float> > centerVisibility(clusters);
+  for(unsigned int i=0; i<clusters; ++i) {
+    centerVisibility[i] = visibilityVectors[indices[i]];
+  }
+
+  // merge()
+  
+  bool merged;
+  int rounds = 1;
+  do {
+
+    // compute center coords and visibility vectors
+    std::map<int, std::vector<int> >::iterator it;
+    for(it=clusterMembers.begin(); it!=clusterMembers.end(); ++it) {
+      if (it->second.size() == 0) {
+	printf("ERROR: cluster has no members and was not erased\n");
+	continue;
+      }
+      
+      int x = 0, y = 0;
+      for(unsigned int i=0; i<it->second.size(); ++i) {
+	x += freeIndices[it->second[i]].first;
+	y += freeIndices[it->second[i]].second;
+      }
+      x /= it->second.size();
+      y /= it->second.size();
+
+      std::pair<int, int> cp(x, y);
+      centers[it->first] = cp;
+
+      it->second.clear(); // clear members
+    }
+
+    // compute visibility vectors
+
+    // find best center for each coord
+    for(unsigned int j=0; j<freeIndices.size(); ++j) {
+      float maxScore = -1;
+      int bestCenter = -1; 
+      for(unsigned int k=0; k<centerVisibility.size(); ++k) {
+	float curScore = score(visibilityVectors[j], centerVisibility[k]);
+	if (curScore > maxScore) {
+	  maxScore = curScore;
+	  bestCenter = k;
+	}
+      }
+      clusterMembers[bestCenter].push_back(j);
+    }
+
+    // erase clusters with no members
+
+    // merge all 
+    //merged = merge();
+    
+    rounds++;
+  }
+  while(merged && rounds < KMEDOIDS_LIMIT);
 }
 
 void Segment::split(const std::string &s, std::vector<std::string> &elems) {
@@ -354,18 +489,11 @@ bool Segment::visible(int xstart, int ystart, int xend, int yend, int buffer) {
   }
 
   for(int i=xstart+buffer; i<=xend-buffer; ++i) {
-    int j = ystart + (i - xstart) * abs(yend-ystart) / (xend - xstart);
-
-    if (vert) {
-      if (walls[j][i]) {
-	vis = false;
-	break;
-      }
-    } else {
-      if (walls[i][j]) {
-	vis = false;
-	break;
-      }
+    int j = ystart + (i - xstart) * (yend-ystart) / (xend - xstart);
+    
+    if (vert && walls[j][i] || !vert && walls[i][j]) {
+      vis = false;
+      break;
     }
   }
 
@@ -391,4 +519,20 @@ void Segment::normalize(std::vector<float> &v) {
   for(unsigned int i=0; i<v.size(); ++i) {
     v[i] = v[i] / sum;
   }
+}
+
+// returns score from 0 to 1 (assuming vectors are normalized)
+float Segment::score(std::vector<float> &one, std::vector<float> &two) {
+  if (one.size() != two.size()) {
+    return -1;
+  }
+
+  // assuming both vectors are normalized
+  float score = 0;
+  for(unsigned int i=0; i<one.size(); ++i) {
+    if (one[i] != 0 && two[i] != 0) {
+      score += one[i] + two[i];
+    }
+  }
+  return score/2;
 }

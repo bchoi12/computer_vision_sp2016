@@ -7,14 +7,17 @@
 #define END_HEADER "end_header"
 #define MASK_WIDTH 200
 #define WALL_THRESH 0.25
-#define SUBSAMPLE_STEP 100
+#define SUBSAMPLE_STEP 4
 #define VISIBILITY_BUFFER 2
+#define MERGE_THRESH 0.4
+#define NUM_CLUSTERS 200
+#define KMEDOIDS_LIMIT 100
 
 #define DEBUG 1
 
 class Segment {
  public:
-  std::vector<int> wallIndices, freeIndices;
+  std::vector< std::pair<int, int> > wallIndices, freeIndices;
   std::vector< std::vector<int> > density;
   std::vector< std::vector<bool> > walls, freeSpace;
   std::vector< std::vector<float> > visibilityVectors;
@@ -41,8 +44,10 @@ class Segment {
   void close(std::vector< std::vector<bool> > &mask);
   void setKernel(std::vector< std::vector<bool> > &kernel);
 
-  void computeVisibility();
-  void testVisibility();
+  void computeFreeSpaceVisibility();
+  void testVisibility(int testIndex, std::string output);
+
+  void clustering(int clusters = NUM_CLUSTERS);
   
  private:
   char * filename;
@@ -55,6 +60,9 @@ class Segment {
   bool visible(int xstart, int ystart, int xend, int yend, int buffer=VISIBILITY_BUFFER);
   void swap(int &one, int &two);
   void normalize(std::vector<float> &v);
+  float score(std::vector<float> &one, std::vector<float> &two);
+  void computeVisibility(int fx, int fy, std::vector<float> &out);
+
 };
 
 #endif
