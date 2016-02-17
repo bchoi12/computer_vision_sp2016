@@ -128,6 +128,46 @@ void Segment::binaryMap(std::vector< std::vector<bool> > &map, std::string outpu
     printf("Wrote binary map %s\n", outputName.c_str());
   }
 }
+
+void Segment::clusterMap(std::map< int, std::vector<int> > &clusters, std::string outputName) {
+  const unsigned int mapHeight = height, mapWidth = width;
+
+  outputName += ".ppm";
+
+  std::vector< std::vector<int> > colors;
+
+  colors.resize(height);
+  for(unsigned int i=0; i<colors.size(); ++i) {
+    colors[i].resize(width);
+  }
+
+  std::map< int, std::vector<int> >::iterator it;
+  for(it=clusters.begin(); it!=clusters.end(); ++it) {
+    std::vector<int> members = it->second;
+    for(unsigned int i=0; i<members.size(); ++i) {
+      std::pair<int, int> coords = freeIndices[members[i]];
+      colors[coords.first][coords.second] = it->first;
+    }
+  }
+
+  FILE *fp = fopen(outputName.c_str(), "wb");
+  fprintf(fp, "P6\n%d %d\n255\n", mapWidth, mapHeight);
+  for(unsigned int i=0; i<mapHeight; ++i) {
+    for(unsigned int j=0; j<mapWidth; ++j) {
+      static unsigned char color[3];
+      color[0] = colors[i][j] * 317317 % 255;
+      color[1] = colors[i][j] * 8505 % 255;
+      color[2] = colors[i][j] * 7272 % 255;
+      fwrite(color, 1, 3, fp);
+    }
+  }
+
+  fclose(fp);
+
+  if (DEBUG) {
+    printf("Wrote cluster map %s\n", outputName.c_str());
+  }
+}
   
 void Segment::coord2index(float x, float y, int &xindex, int &yindex) {
   xindex = std::min((int) ((x - xmin) / (xmax - xmin) * width), (int) width-1);
@@ -327,7 +367,7 @@ void Segment::testVisibility(int testIndex, std::string output) {
 }
 
 void Segment::clustering(int clusters) {
-  clusters = std::max(clusters, (int) freeIndices.size());
+  clusters = std::min(clusters, (int) freeIndices.size());
 
   // pick random vertices to be initial cluster centers
   std::vector<int> indices(freeIndices.size());
@@ -346,7 +386,7 @@ void Segment::clustering(int clusters) {
   std::map<int, std::vector<int> > clusterMembers;
   for(unsigned int i=0; i<clusters; ++i) {
     std::vector<int> v;
-    v.push_back(indices[i]);
+    //v.push_back(indices[i]);
     clusterMembers[i] = v;
   }
 
@@ -356,58 +396,70 @@ void Segment::clustering(int clusters) {
     centerVisibility[i] = visibilityVectors[indices[i]];
   }
 
-  // merge()
-  
-  bool merged;
+  // add free space points to clusters
+  for(unsigned int i=0; i<freeIndices.size(); ++i) {
+    float bestScore = 1;
+    int bestCenter = 0;
+    for(unsigned int j=0; j<clusters; ++j) {
+      float score = distance(visibilityVectors[i], visibilityVectors[indices[j]]);
+      if (score < bestScore) {
+	bestScore = score;
+	bestCenter = j;
+      }
+    }
+    clusterMembers[bestCenter].push_back(i);
+  }
+
   int rounds = 1;
+  bool merged = true;
   do {
-
-    // compute center coords and visibility vectors
-    std::map<int, std::vector<int> >::iterator it;
-    for(it=clusterMembers.begin(); it!=clusterMembers.end(); ++it) {
-      if (it->second.size() == 0) {
-	printf("ERROR: cluster has no members and was not erased\n");
-	continue;
-      }
-      
-      int x = 0, y = 0;
-      for(unsigned int i=0; i<it->second.size(); ++i) {
-	x += freeIndices[it->second[i]].first;
-	y += freeIndices[it->second[i]].second;
-      }
-      x /= it->second.size();
-      y /= it->second.size();
-
-      std::pair<int, int> cp(x, y);
-      centers[it->first] = cp;
-
-      it->second.clear(); // clear members
-    }
-
-    // compute visibility vectors
-
-    // find best center for each coord
-    for(unsigned int j=0; j<freeIndices.size(); ++j) {
-      float maxScore = -1;
-      int bestCenter = -1; 
-      for(unsigned int k=0; k<centerVisibility.size(); ++k) {
-	float curScore = score(visibilityVectors[j], centerVisibility[k]);
-	if (curScore > maxScore) {
-	  maxScore = curScore;
-	  bestCenter = k;
-	}
-      }
-      clusterMembers[bestCenter].push_back(j);
-    }
-
-    // erase clusters with no members
-
-    // merge all 
-    //merged = merge();
-    
+    recenter(centers, clusterMembers);
+    merged = merge(centers, clusterMembers, clusters);
     rounds++;
   }
   while(merged && rounds < KMEDOIDS_LIMIT);
+
+  if (DEBUG) {
+    printf("Num clusters: %d\n", clusters);
+    int sum = 0;
+    for(unsigned int i=0; i<clusters; ++i) {
+      printf("Cluster %d: %d elements\n", i, (int) clusterMembers[i].size());
+      sum += clusterMembers[i].size();
+    }
+    printf("Total cluster members: %d, free space poitns: %d\n", sum, (int) freeIndices.size());
+    clusterMap(clusterMembers, "cluster_map");
+  }
+}
+
+// find the best center within a cluster
+void Segment::recenter(std::vector< std::pair<int, int> > &centers, std::map<int, std::vector<int> > &clusterMembers) {
+  std::map<int, std::vector<int> >::iterator it;
+  for(it=clusterMembers.begin(); it!=clusterMembers.end(); ++it) {
+    std::vector<int> members = it->second;
+    float bestScore = members.size();
+    std::pair<int, int> bestCenter;
+
+    for(unsigned int i=0; i<members.size(); ++i) {
+      float score = 0;
+      for(unsigned int j=0; j<members.size(); ++j) {
+	if (i == j) {
+	  continue;
+	}
+	score += distance(visibilityVectors[i], visibilityVectors[j]);
+      }
+      if (score < bestScore) {
+	bestScore = score;
+	bestCenter = freeIndices[i];
+      }
+    }
+
+    centers[it->first] = bestCenter;
+  }
+}
+
+// delete clusters with no members, merge clusters that are close
+bool Segment::merge(std::vector< std::pair<int, int> > &centers, std::map<int, std::vector<int> > &clusterMembers, int &clusters) {
+  return false;
 }
 
 void Segment::split(const std::string &s, std::vector<std::string> &elems) {
@@ -418,7 +470,6 @@ void Segment::split(const std::string &s, std::vector<std::string> &elems) {
     elems.push_back(item);
   }
 }
-
 
 void Segment::readFile() {
   printf("Reading from file %s\n", filename);
@@ -521,8 +572,8 @@ void Segment::normalize(std::vector<float> &v) {
   }
 }
 
-// returns score from 0 to 1 (assuming vectors are normalized)
-float Segment::score(std::vector<float> &one, std::vector<float> &two) {
+// returns normalized distance from 0 to 1 (assuming vectors are normalized)
+float Segment::distance(std::vector<float> &one, std::vector<float> &two) {
   if (one.size() != two.size()) {
     return -1;
   }
@@ -530,7 +581,7 @@ float Segment::score(std::vector<float> &one, std::vector<float> &two) {
   // assuming both vectors are normalized
   float score = 0;
   for(unsigned int i=0; i<one.size(); ++i) {
-    if (one[i] != 0 && two[i] != 0) {
+    if (one[i] == 0 && two[i] != 0 || one[i] != 0 && two[i] == 0) {
       score += one[i] + two[i];
     }
   }

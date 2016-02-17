@@ -1,6 +1,7 @@
 #ifndef SEGMENT_H
 #define SEGMENT_H
 
+#include <map>
 #include <string>
 #include <vector>
 
@@ -17,7 +18,7 @@
 
 class Segment {
  public:
-  std::vector< std::pair<int, int> > wallIndices, freeIndices;
+  std::vector< std::pair<int, int> > wallIndices, freeIndices; // subsampled indices of walls/free space
   std::vector< std::vector<int> > density;
   std::vector< std::vector<bool> > walls, freeSpace;
   std::vector< std::vector<float> > visibilityVectors;
@@ -32,6 +33,7 @@ class Segment {
   
   void densityMap(std::vector< std::vector<int> > &map, std::string outputName);
   void binaryMap(std::vector< std::vector<bool> > &map, std::string outputName);
+  void clusterMap(std::map< int, std::vector<int> > &clusters, std::string outputName);
   
   void coord2index(float x, float y, int &xindex, int &yindex);
   void index2coord(int xindex, int yindex, float &x, float &y);
@@ -60,8 +62,10 @@ class Segment {
   bool visible(int xstart, int ystart, int xend, int yend, int buffer=VISIBILITY_BUFFER);
   void swap(int &one, int &two);
   void normalize(std::vector<float> &v);
-  float score(std::vector<float> &one, std::vector<float> &two);
+  float distance(std::vector<float> &one, std::vector<float> &two);
   void computeVisibility(int fx, int fy, std::vector<float> &out);
+  void recenter(std::vector< std::pair<int, int> > &centers, std::map<int, std::vector<int> > &clusterMembers);
+  bool merge(std::vector< std::pair<int, int> > &centers, std::map<int, std::vector<int> > &clusterMembers, int &clusters);
 
 };
 
