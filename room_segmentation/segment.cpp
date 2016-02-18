@@ -1,5 +1,4 @@
 
-
 #include "segment.h"
 #include <stdlib.h>
 
@@ -156,8 +155,8 @@ void Segment::clusterMap(std::map< int, std::vector<int> > &clusters, std::strin
     for(unsigned int j=0; j<mapWidth; ++j) {
       static unsigned char color[3];
       color[0] = colors[i][j] * 317317 % 255;
-      color[1] = colors[i][j] * 8505 % 255;
-      color[2] = colors[i][j] * 7272 % 255;
+      color[1] = colors[i][j] * 727272 % 255;
+      color[2] = colors[i][j] * 123432 % 255;
       fwrite(color, 1, 3, fp);
     }
   }
@@ -410,11 +409,11 @@ void Segment::clustering(int clusters) {
     clusterMembers[bestCenter].push_back(i);
   }
 
-  int rounds = 1;
+  int rounds = 0;
   bool merged = true;
   do {
-    recenter(centers, clusterMembers);
-    merged = merge(centers, clusterMembers, clusters);
+    recenter(centers, clusterMembers, indices);
+    merged = merge(centers, clusterMembers, indices, clusters);
     rounds++;
   }
   while(merged && rounds < KMEDOIDS_LIMIT);
@@ -427,12 +426,13 @@ void Segment::clustering(int clusters) {
       sum += clusterMembers[i].size();
     }
     printf("Total cluster members: %d, free space poitns: %d\n", sum, (int) freeIndices.size());
+    printf("Merged %d times\n", rounds);
     clusterMap(clusterMembers, "cluster_map");
   }
 }
 
 // find the best center within a cluster
-void Segment::recenter(std::vector< std::pair<int, int> > &centers, std::map<int, std::vector<int> > &clusterMembers) {
+void Segment::recenter(std::vector< std::pair<int, int> > &centers, std::map<int, std::vector<int> > &clusterMembers, std::vector<int> &indices) {
   std::map<int, std::vector<int> >::iterator it;
   for(it=clusterMembers.begin(); it!=clusterMembers.end(); ++it) {
     std::vector<int> members = it->second;
@@ -445,7 +445,7 @@ void Segment::recenter(std::vector< std::pair<int, int> > &centers, std::map<int
 	if (i == j) {
 	  continue;
 	}
-	score += distance(visibilityVectors[i], visibilityVectors[j]);
+	score += distance(visibilityVectors[indices[i]], visibilityVectors[indices[j]]);
       }
       if (score < bestScore) {
 	bestScore = score;
@@ -458,8 +458,35 @@ void Segment::recenter(std::vector< std::pair<int, int> > &centers, std::map<int
 }
 
 // delete clusters with no members, merge clusters that are close
-bool Segment::merge(std::vector< std::pair<int, int> > &centers, std::map<int, std::vector<int> > &clusterMembers, int &clusters) {
-  return false;
+bool Segment::merge(std::vector< std::pair<int, int> > &centers, std::map<int, std::vector<int> > &clusterMembers, std::vector<int> &indices, int &clusters) {
+  int origClusters = clusters;
+
+  std::vector<int> merged;
+  
+  std::map<int, std::vector<int> >::iterator i, j;
+  for(i=clusterMembers.begin(); i!=clusterMembers.end(); ++i) {
+    if (i->second.size() == 0) {
+      merged.push_back(i->first);
+      continue;
+    }
+    for(j=i; j!=clusterMembers.end(); ++j) {
+      if (i==j || j->second.size() == 0) {
+	continue;
+      }
+
+      if (distance(visibilityVectors[indices[i->first]], visibilityVectors[indices[j->first]]) < MERGE_THRESH) {
+	i->second.insert(i->second.end(), j->second.begin(), j->second.end());
+	j->second.clear();
+	merged.push_back(j->first);
+      }
+    }
+  }
+
+  for(unsigned int k=0; k<merged.size(); ++k) {
+    clusters -= clusterMembers.erase(merged[k]);
+  }
+  
+  return origClusters != clusters;
 }
 
 void Segment::split(const std::string &s, std::vector<std::string> &elems) {

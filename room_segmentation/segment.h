@@ -10,7 +10,7 @@
 #define WALL_THRESH 0.25
 #define SUBSAMPLE_STEP 4
 #define VISIBILITY_BUFFER 2
-#define MERGE_THRESH 0.4
+#define MERGE_THRESH 0.6
 #define NUM_CLUSTERS 200
 #define KMEDOIDS_LIMIT 100
 
@@ -64,8 +64,8 @@ class Segment {
   void normalize(std::vector<float> &v);
   float distance(std::vector<float> &one, std::vector<float> &two);
   void computeVisibility(int fx, int fy, std::vector<float> &out);
-  void recenter(std::vector< std::pair<int, int> > &centers, std::map<int, std::vector<int> > &clusterMembers);
-  bool merge(std::vector< std::pair<int, int> > &centers, std::map<int, std::vector<int> > &clusterMembers, int &clusters);
+  void recenter(std::vector< std::pair<int, int> > &centers, std::map<int, std::vector<int> > &clusterMembers, std::vector<int> &indices);
+  bool merge(std::vector< std::pair<int, int> > &centers, std::map<int, std::vector<int> > &clusterMembers, std::vector<int> &indices, int &clusters);
 
 };
 
