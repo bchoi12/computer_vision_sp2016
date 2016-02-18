@@ -78,8 +78,8 @@ void Segment::densityMap(std::vector< std::vector<int> > &map, std::string outpu
   }
 
   int mapMax = map[0][0];
-  for(unsigned int i=0; i<mapWidth; ++i) {
-    for(unsigned int j=0; j<mapHeight; ++j) {
+  for(unsigned int i=0; i<mapHeight; ++i) {
+    for(unsigned int j=0; j<mapWidth; ++j) {
       mapMax = std::max(mapMax, map[i][j]);
     }
   }
@@ -129,7 +129,6 @@ void Segment::binaryMap(std::vector< std::vector<bool> > &map, std::string outpu
 }
 
 void Segment::clusterMap(std::map< int, std::vector<int> > &clusters, std::string outputName) {
-  const unsigned int mapHeight = height, mapWidth = width;
 
   outputName += ".ppm";
 
@@ -145,18 +144,18 @@ void Segment::clusterMap(std::map< int, std::vector<int> > &clusters, std::strin
     std::vector<int> members = it->second;
     for(unsigned int i=0; i<members.size(); ++i) {
       std::pair<int, int> coords = freeIndices[members[i]];
-      colors[coords.first][coords.second] = it->first;
+      colors[coords.first][coords.second] = it->first+1;
     }
   }
 
   FILE *fp = fopen(outputName.c_str(), "wb");
-  fprintf(fp, "P6\n%d %d\n255\n", mapWidth, mapHeight);
-  for(unsigned int i=0; i<mapHeight; ++i) {
-    for(unsigned int j=0; j<mapWidth; ++j) {
+  fprintf(fp, "P6\n%d %d\n255\n", width, height);
+  for(unsigned int i=0; i<height; ++i) {
+    for(unsigned int j=0; j<width; ++j) {
       static unsigned char color[3];
-      color[0] = colors[i][j] * 317317 % 255;
-      color[1] = colors[i][j] * 727272 % 255;
-      color[2] = colors[i][j] * 123432 % 255;
+      color[0] = colors[i][j] * 317421 % 255;
+      color[1] = colors[i][j] * 941827 % 255;
+      color[2] = colors[i][j] * 893053 % 255;
       fwrite(color, 1, 3, fp);
     }
   }
@@ -373,13 +372,9 @@ void Segment::clustering(int clusters) {
   for(unsigned int i=0; i<freeIndices.size(); ++i) {
     indices[i] = i;
   }
+  std::srand(unsigned(time(NULL)));
   std::random_shuffle(indices.begin(), indices.end());
-
-  // vector of each cluster center's mask coordinates
-  std::vector<std::pair<int, int> > centers(clusters);
-  for(unsigned int i=0; i<clusters; ++i) {
-    centers[i] = freeIndices[indices[i]]; 
-  }
+  indices.resize(clusters);
 
   // map of cluster center to vector of cluster's members 
   std::map<int, std::vector<int> > clusterMembers;
@@ -387,12 +382,6 @@ void Segment::clustering(int clusters) {
     std::vector<int> v;
     //v.push_back(indices[i]);
     clusterMembers[i] = v;
-  }
-
-  // vector of cluster center visibility vectors
-  std::vector< std::vector<float> > centerVisibility(clusters);
-  for(unsigned int i=0; i<clusters; ++i) {
-    centerVisibility[i] = visibilityVectors[indices[i]];
   }
 
   // add free space points to clusters
@@ -412,8 +401,8 @@ void Segment::clustering(int clusters) {
   int rounds = 0;
   bool merged = true;
   do {
-    recenter(centers, clusterMembers, indices);
-    merged = merge(centers, clusterMembers, indices, clusters);
+    recenter(clusterMembers, indices);
+    merged = merge(clusterMembers, indices, clusters);
     rounds++;
   }
   while(merged && rounds < KMEDOIDS_LIMIT);
@@ -421,23 +410,26 @@ void Segment::clustering(int clusters) {
   if (DEBUG) {
     printf("Num clusters: %d\n", clusters);
     int sum = 0;
-    for(unsigned int i=0; i<clusters; ++i) {
-      printf("Cluster %d: %d elements\n", i, (int) clusterMembers[i].size());
-      sum += clusterMembers[i].size();
+    std::map<int, std::vector<int> >::iterator it;
+    for(it=clusterMembers.begin(); it!=clusterMembers.end(); ++it) {
+      if (it->second.size() != 0) {
+	printf("Cluster %d size: %d\n", it->first, (int) it->second.size());
+	sum += it->second.size();
+      }
     }
-    printf("Total cluster members: %d, free space poitns: %d\n", sum, (int) freeIndices.size());
+    printf("Total cluster members: %d, free space points: %d\n", sum, (int) freeIndices.size());
     printf("Merged %d times\n", rounds);
     clusterMap(clusterMembers, "cluster_map");
   }
 }
 
 // find the best center within a cluster
-void Segment::recenter(std::vector< std::pair<int, int> > &centers, std::map<int, std::vector<int> > &clusterMembers, std::vector<int> &indices) {
+void Segment::recenter(std::map<int, std::vector<int> > &clusterMembers, std::vector<int> &indices) {
   std::map<int, std::vector<int> >::iterator it;
   for(it=clusterMembers.begin(); it!=clusterMembers.end(); ++it) {
     std::vector<int> members = it->second;
     float bestScore = members.size();
-    std::pair<int, int> bestCenter;
+    int bestIndex = 0;
 
     for(unsigned int i=0; i<members.size(); ++i) {
       float score = 0;
@@ -445,28 +437,28 @@ void Segment::recenter(std::vector< std::pair<int, int> > &centers, std::map<int
 	if (i == j) {
 	  continue;
 	}
-	score += distance(visibilityVectors[indices[i]], visibilityVectors[indices[j]]);
+	score += distance(visibilityVectors[members[i]], visibilityVectors[members[j]]);
       }
       if (score < bestScore) {
 	bestScore = score;
-	bestCenter = freeIndices[i];
+	bestIndex = members[i];
       }
     }
 
-    centers[it->first] = bestCenter;
+    indices[it->first] = bestIndex;
   }
 }
 
 // delete clusters with no members, merge clusters that are close
-bool Segment::merge(std::vector< std::pair<int, int> > &centers, std::map<int, std::vector<int> > &clusterMembers, std::vector<int> &indices, int &clusters) {
+bool Segment::merge(std::map<int, std::vector<int> > &clusterMembers, std::vector<int> &indices, int &clusters) {
   int origClusters = clusters;
 
-  std::vector<int> merged;
+  std::vector<bool> merged(indices.size());
   
   std::map<int, std::vector<int> >::iterator i, j;
   for(i=clusterMembers.begin(); i!=clusterMembers.end(); ++i) {
     if (i->second.size() == 0) {
-      merged.push_back(i->first);
+      merged[i->first] = true;
       continue;
     }
     for(j=i; j!=clusterMembers.end(); ++j) {
@@ -477,13 +469,14 @@ bool Segment::merge(std::vector< std::pair<int, int> > &centers, std::map<int, s
       if (distance(visibilityVectors[indices[i->first]], visibilityVectors[indices[j->first]]) < MERGE_THRESH) {
 	i->second.insert(i->second.end(), j->second.begin(), j->second.end());
 	j->second.clear();
-	merged.push_back(j->first);
       }
     }
   }
 
   for(unsigned int k=0; k<merged.size(); ++k) {
-    clusters -= clusterMembers.erase(merged[k]);
+    if (merged[k]) {
+      clusters -= clusterMembers.erase(k);
+    }
   }
   
   return origClusters != clusters;

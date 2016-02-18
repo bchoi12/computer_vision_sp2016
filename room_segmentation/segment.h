@@ -6,7 +6,7 @@
 #include <vector>
 
 #define END_HEADER "end_header"
-#define MASK_WIDTH 200
+#define MASK_WIDTH 300
 #define WALL_THRESH 0.25
 #define SUBSAMPLE_STEP 4
 #define VISIBILITY_BUFFER 2
@@ -64,8 +64,8 @@ class Segment {
   void normalize(std::vector<float> &v);
   float distance(std::vector<float> &one, std::vector<float> &two);
   void computeVisibility(int fx, int fy, std::vector<float> &out);
-  void recenter(std::vector< std::pair<int, int> > &centers, std::map<int, std::vector<int> > &clusterMembers, std::vector<int> &indices);
-  bool merge(std::vector< std::pair<int, int> > &centers, std::map<int, std::vector<int> > &clusterMembers, std::vector<int> &indices, int &clusters);
+  void recenter(std::map<int, std::vector<int> > &clusterMembers, std::vector<int> &indices);
+  bool merge(std::map<int, std::vector<int> > &clusterMembers, std::vector<int> &indices, int &clusters);
 
 };
 
