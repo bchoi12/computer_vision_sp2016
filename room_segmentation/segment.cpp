@@ -365,6 +365,11 @@ void Segment::testVisibility(int testIndex, std::string output) {
 }
 
 void Segment::clustering(int clusters) {
+
+  if (DEBUG) {
+    printf("Beginning clustering...\n");
+  }
+  
   clusters = std::min(clusters, (int) freeIndices.size());
 
   // pick random vertices to be initial cluster centers
@@ -400,11 +405,12 @@ void Segment::clustering(int clusters) {
   int rounds = 0;
   bool merged = true;
   do {
+    printf("Recentering and merging round %d, %d clusters left\n", rounds+1, clusters);
     recenter(clusterMembers, indices);
     merged = merge(clusterMembers, indices, clusters);
     rounds++;
   }
-  while(merged && rounds < KMEDOIDS_LIMIT);
+  while(merged && rounds < KMEDOIDS_LIMIT || clusters == 1);
 
   if (DEBUG) {
     printf("Num clusters: %d\n", clusters);
@@ -424,6 +430,9 @@ void Segment::clustering(int clusters) {
 
 // find the best center within a cluster
 void Segment::recenter(std::map<int, std::vector<int> > &clusterMembers, std::vector<int> &indices) {
+
+  printf("Recentering...\n");
+  
   std::map<int, std::vector<int> >::iterator it;
   for(it=clusterMembers.begin(); it!=clusterMembers.end(); ++it) {
     std::vector<int> members = it->second;
@@ -450,8 +459,13 @@ void Segment::recenter(std::map<int, std::vector<int> > &clusterMembers, std::ve
 
 // delete clusters with no members, merge clusters that are close
 bool Segment::merge(std::map<int, std::vector<int> > &clusterMembers, std::vector<int> &indices, int &clusters) {
-  int origClusters = clusters;
 
+  if (DEBUG) {
+    printf("Merging clusters...\n");
+  }
+  
+  int origClusters = clusters;
+  
   std::vector<int> mergeTo(indices.size());
   std::vector<int> bestMerge(indices.size());
   std::vector<float> bestScore(indices.size());
@@ -489,6 +503,12 @@ bool Segment::merge(std::map<int, std::vector<int> > &clusterMembers, std::vecto
   }
 
   for(unsigned int k=0; k<bestMerge.size(); ++k) {
+
+    // prevents merging into self
+    if (mergeTo[bestMerge[k]] == k) {
+      continue;
+    }
+    
     if (bestMerge[k] == bestMerge[bestMerge[k]]) {
       if (k < bestMerge[k]) {
 	continue;
@@ -498,11 +518,6 @@ bool Segment::merge(std::map<int, std::vector<int> > &clusterMembers, std::vecto
       
       mergeTo[k] = mergeTo[bestMerge[k]];
     } else if (bestScore[k] < MERGE_THRESH) {
-
-      // prevents cycles of merging
-      if (mergeTo[bestMerge[k]] == k) {
-	continue;
-      }
       
       clusterMembers[mergeTo[bestMerge[k]]].insert(clusterMembers[mergeTo[bestMerge[k]]].end(), clusterMembers[k].begin(), clusterMembers[k].end());
       clusterMembers[k].clear();

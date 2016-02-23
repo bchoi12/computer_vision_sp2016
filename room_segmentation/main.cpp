@@ -7,7 +7,7 @@
 #include "segment.h"
 
 #define OPEN_FREESPACE 1
-#define CLOSE_WALLS 1
+#define CLOSE_WALLS 0
 #define TEST_VISIBILITY 0
 
 void test(Segment &segment, int start, int end);
