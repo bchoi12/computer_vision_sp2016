@@ -380,7 +380,6 @@ void Segment::clustering(int clusters) {
   std::map<int, std::vector<int> > clusterMembers;
   for(unsigned int i=0; i<clusters; ++i) {
     std::vector<int> v;
-    //v.push_back(indices[i]);
     clusterMembers[i] = v;
   }
 
@@ -453,28 +452,73 @@ void Segment::recenter(std::map<int, std::vector<int> > &clusterMembers, std::ve
 bool Segment::merge(std::map<int, std::vector<int> > &clusterMembers, std::vector<int> &indices, int &clusters) {
   int origClusters = clusters;
 
-  std::vector<bool> merged(indices.size());
+  std::vector<int> mergeTo(indices.size());
+  std::vector<int> bestMerge(indices.size());
+  std::vector<float> bestScore(indices.size());
+
+  for(unsigned int i=0; i<indices.size(); ++i) {
+    mergeTo[i] = i;
+    bestMerge[i] = -1;
+    bestScore[i] = 1;
+  }
   
   std::map<int, std::vector<int> >::iterator i, j;
   for(i=clusterMembers.begin(); i!=clusterMembers.end(); ++i) {
     if (i->second.size() == 0) {
-      merged[i->first] = true;
       continue;
     }
-    for(j=i; j!=clusterMembers.end(); ++j) {
+
+    int curMerge = i->first;
+    float minDist = 1;
+    
+    for(j=clusterMembers.begin(); j!=clusterMembers.end(); ++j) {
       if (i==j || j->second.size() == 0) {
 	continue;
       }
 
-      if (distance(visibilityVectors[indices[i->first]], visibilityVectors[indices[j->first]]) < MERGE_THRESH) {
-	i->second.insert(i->second.end(), j->second.begin(), j->second.end());
-	j->second.clear();
+      float curDist = distance(visibilityVectors[indices[i->first]], visibilityVectors[indices[j->first]]);
+      if (curDist < minDist) {
+	minDist = curDist;
+	curMerge = j->first;
+	//i->second.insert(i->second.end(), j->second.begin(), j->second.end());
+	//j->second.clear();
       }
+    }
+    bestMerge[i->first] = curMerge;
+    bestScore[i->first] = minDist;
+  }
+
+  for(unsigned int k=0; k<bestMerge.size(); ++k) {
+    if (bestMerge[k] == bestMerge[bestMerge[k]]) {
+      if (k < bestMerge[k]) {
+	continue;
+      }
+      clusterMembers[mergeTo[bestMerge[k]]].insert(clusterMembers[mergeTo[bestMerge[k]]].end(), clusterMembers[k].begin(), clusterMembers[k].end());
+      clusterMembers[k].clear();
+      
+      mergeTo[k] = mergeTo[bestMerge[k]];
+    } else if (bestScore[k] < MERGE_THRESH) {
+
+      // prevents cycles of merging
+      if (mergeTo[bestMerge[k]] == k) {
+	continue;
+      }
+      
+      clusterMembers[mergeTo[bestMerge[k]]].insert(clusterMembers[mergeTo[bestMerge[k]]].end(), clusterMembers[k].begin(), clusterMembers[k].end());
+      clusterMembers[k].clear();
+      
+      mergeTo[k] = mergeTo[bestMerge[k]];
     }
   }
 
-  for(unsigned int k=0; k<merged.size(); ++k) {
-    if (merged[k]) {
+  for(unsigned int k=0; k<bestMerge.size(); ++k) {
+    if ( bestScore[k] < MERGE_THRESH) {
+
+    }
+  }
+
+  for(unsigned int k=0; k<indices.size(); ++k) {
+    if (clusterMembers.count(k) > 0 && clusterMembers[k].size() == 0) {
       clusters -= clusterMembers.erase(k);
     }
   }

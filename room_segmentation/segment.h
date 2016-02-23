@@ -12,7 +12,7 @@
 #define VISIBILITY_BUFFER 2
 #define MERGE_THRESH 0.5
 #define NUM_CLUSTERS 200
-#define KMEDOIDS_LIMIT 100
+#define KMEDOIDS_LIMIT 20
 
 #define DEBUG 1
 
