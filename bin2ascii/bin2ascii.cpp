@@ -32,21 +32,23 @@ std::map<std::string, char> sizes = initSizes();
 
 int main(int argc, char** argv) {
   if (argc < 2) {
-    printf("Usage: bin2ascii fname\n  fname: input ply in binary big endian format");
+    printf("Usage: bin2ascii fname\n  fname: input ply in binary big endian format\n");
     return 1;
   }
 
   std::string inputFile = argv[1];
   if (inputFile.substr(inputFile.find_last_of('.')+1) != "ply") {
-    printf("Error: expected ply file");
+    printf("Error: expected ply file\n");
     return 2;
   }
 
   std::ifstream ifs(inputFile.c_str(), std::ios::binary);
-  std::string outputFile = inputFile.substr(0, inputFile.find_last_of('.')) + "_ascii.ply";
-  std::ofstream ofs(outputFile.c_str());
 
   if (ifs.is_open()) {
+
+    std::string outputFile = inputFile.substr(0, inputFile.find_last_of('.')) + "_ascii.ply";
+    std::ofstream ofs(outputFile.c_str());
+    
     if (DEBUG) {
       printf("Converting %s to %s...\n", inputFile.c_str(), outputFile.c_str());
     }
@@ -104,11 +106,16 @@ int main(int argc, char** argv) {
     for(unsigned int i=0; i<edges; i++) {
       writeASCII(ifs, ofs, edgeProperties);
     }
+    ofs.close();
+  } else {
+    printf("Error opening file\n");
+    return 3;
   }
 
   ifs.close();
-  ofs.close();
 
+  printf("Finished!\n");
+  
   return 0;
 }
 
