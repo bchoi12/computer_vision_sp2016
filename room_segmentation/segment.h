@@ -8,7 +8,7 @@
 #define END_HEADER "end_header"
 #define MASK_WIDTH 300
 #define WALL_THRESH 0.25
-#define SUBSAMPLE_STEP 1
+#define SUBSAMPLE_STEP 3
 #define VISIBILITY_BUFFER 2
 #define MERGE_THRESH 0.6
 #define NUM_CLUSTERS 200
