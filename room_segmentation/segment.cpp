@@ -410,7 +410,7 @@ void Segment::clustering(int clusters) {
     merged = merge(clusterMembers, indices, clusters);
     rounds++;
   }
-  while(merged && rounds < KMEDOIDS_LIMIT || clusters == 1);
+  while(merged && rounds < KMEDOIDS_LIMIT && clusters > 1);
 
   if (DEBUG) {
     printf("Num clusters: %d\n", clusters);

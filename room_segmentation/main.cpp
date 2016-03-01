@@ -17,8 +17,14 @@ int main(int argc, char** argv) {
     printf("Usage: segment fname\n  fname: input ply in ascii format");
     return 1;
   }
+
+  int width = MASK_WIDTH;
+
+  if (argc > 2) {
+    width = atoi(argv[2]);
+  }
   
-  Segment segment(argv[1]);
+  Segment segment(argv[1], width);
 
   segment.computeDensity();
   segment.findWalls();
