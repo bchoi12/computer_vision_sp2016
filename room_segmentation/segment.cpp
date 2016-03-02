@@ -1,4 +1,3 @@
-
 #include "segment.h"
 #include <stdlib.h>
 
@@ -388,25 +387,14 @@ void Segment::clustering(int clusters) {
     clusterMembers[i] = v;
   }
 
-  // add free space points to clusters
-  for(unsigned int i=0; i<freeIndices.size(); ++i) {
-    float bestScore = 1;
-    int bestCenter = 0;
-    for(unsigned int j=0; j<clusters; ++j) {
-      float score = distance(visibilityVectors[i], visibilityVectors[indices[j]]);
-      if (score < bestScore) {
-	bestScore = score;
-	bestCenter = j;
-      }
-    }
-    clusterMembers[bestCenter].push_back(i);
-  }
+  assignClusters(clusterMembers, indices);
 
   int rounds = 0;
   bool merged = true;
   do {
     printf("Recentering and merging round %d, %d clusters left\n", rounds+1, clusters);
     recenter(clusterMembers, indices);
+    assignClusters(clusterMembers, indices);
     merged = merge(clusterMembers, indices, clusters);
     rounds++;
   }
@@ -454,6 +442,36 @@ void Segment::recenter(std::map<int, std::vector<int> > &clusterMembers, std::ve
     }
 
     indices[it->first] = bestIndex;
+  }
+}
+
+void Segment::assignClusters(std::map<int, std::vector<int> > &clusterMembers, std::vector<int> &indices) {
+
+  if (DEBUG) {
+    printf("Reassigning points to clusters\n");
+  }
+  
+  std::map<int, std::vector<int> >::iterator it;
+  for(it=clusterMembers.begin(); it!=clusterMembers.end(); ++it) {
+    it->second.clear();
+  }
+  
+  // add free space points to clusters
+  for(unsigned int i=0; i<freeIndices.size(); ++i) {
+    float bestScore = 1;
+    int bestCenter = 0;
+    for(unsigned int j=0; j<indices.size(); ++j) {
+      if (indices[j] == -1) {
+	continue;
+      }
+      
+      float score = distance(visibilityVectors[i], visibilityVectors[indices[j]]);
+      if (score < bestScore) {
+	bestScore = score;
+	bestCenter = j;
+      }
+    }
+    clusterMembers[bestCenter].push_back(i);
   }
 }
 
@@ -535,6 +553,7 @@ bool Segment::merge(std::map<int, std::vector<int> > &clusterMembers, std::vecto
   for(unsigned int k=0; k<indices.size(); ++k) {
     if (clusterMembers.count(k) > 0 && clusterMembers[k].size() == 0) {
       clusters -= clusterMembers.erase(k);
+      indices[k] = -1;
     }
   }
   

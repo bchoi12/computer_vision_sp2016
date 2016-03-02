@@ -65,6 +65,7 @@ class Segment {
   float distance(std::vector<float> &one, std::vector<float> &two);
   void computeVisibility(int fx, int fy, std::vector<float> &out);
   void recenter(std::map<int, std::vector<int> > &clusterMembers, std::vector<int> &indices);
+  void assignClusters(std::map<int, std::vector<int> > &clusterMembers, std::vector<int> &indices);
   bool merge(std::map<int, std::vector<int> > &clusterMembers, std::vector<int> &indices, int &clusters);
 
 };
