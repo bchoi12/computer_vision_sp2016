@@ -4,7 +4,11 @@
 #include <algorithm>
 #include <fstream>
 #include <map>
+#include <math.h>
 #include <sstream>
+
+#include "opencv2/highgui.hpp"
+#include "opencv2/imgproc.hpp"
 
 Segment::Segment(char* filename, unsigned int width) {
   vertices = 0; faces = 0; edges = 0;
@@ -51,6 +55,8 @@ void Segment::computeDensity() {
   if (DEBUG) {
     printf("Max density: %d pixels\n", maxDensity);
   }
+
+  densityMap(density, "density_map");
 }
 
 void Segment::findWalls(float threshold) {
@@ -67,6 +73,81 @@ void Segment::findWalls(float threshold) {
       freeSpace[i][j] = density[i][j] == 0 ? false : !walls[i][j];
     }
   }
+
+  binaryMap(walls, "wall_map");
+  binaryMap(freeSpace, "freespace_map");
+}
+
+void Segment::findManhattanDirections() {
+  using namespace cv;
+
+  Mat src, src_gray;
+  src = imread("wall_map.ppm", CV_LOAD_IMAGE_COLOR);
+  src.convertTo(src, CV_8U);
+  cvtColor(src, src_gray, CV_BGR2GRAY);
+
+  std::vector<Vec4i> lines;
+  HoughLinesP(src_gray, lines, 1, CV_PI/180, 40, 30, 3); // output, lines_output, resolution, resolution of theta, min number of intersections for line, min line length, max line gap
+  for(unsigned int i=0; i<lines.size(); ++i) {
+    line(src, Point(lines[i][0], lines[i][1]),
+	 Point(lines[i][2], lines[i][3]), Scalar(0, 0, 255));
+  }
+
+  if (lines.size() == 0) {
+    printf("Could not find any line segments! May need to tune hough lines parameters...\n");
+    return;
+  }
+  
+  std::vector<float> angles(lines.size());
+  float avgAngle = 0;
+  for(unsigned int i=0; i<lines.size(); ++i) {
+    float x = lines[i][3] - lines[i][1];
+    float y = lines[i][2] - lines[i][0];
+    angles[i] = abs(x) < 1e-6 ? CV_PI/2 : atan(y/x);
+
+    //printf("%d: %f\n", i, angles[i]);
+    
+    avgAngle += angles[i];
+  }
+
+  avgAngle /= angles.size();
+
+  mainAngle = 0, perpAngle = 0;
+  int numMain = 0, numPerp = 0;
+
+  //printf("Avg angle: %f\n", avgAngle);
+
+  for(unsigned int i=0; i<angles.size(); ++i) {
+    if (angles[i] > avgAngle) {
+      mainAngle += angles[i];
+      numMain++;
+    } else {
+      perpAngle += angles[i];
+      numPerp++;
+    }
+  }
+
+  if (numMain > 0) {
+    mainAngle /= numMain;
+    if (numPerp == 0) {
+      perpAngle = mainAngle - CV_PI/2;
+    }
+  }
+  if (numPerp > 0) {
+    perpAngle /= numPerp;
+    if (numMain == 0) {
+      mainAngle = perpAngle + CV_PI/2;
+    }
+  }
+  
+  printf("Main angle: %f\nPerp angle: %f\n", mainAngle, perpAngle);
+
+  /*
+  namedWindow("Lines", 1);
+  imshow("Lines", src);
+  waitKey(0);
+  */
+  
 }
   
 void Segment::densityMap(std::vector< std::vector<int> > &map, std::string outputName) {
@@ -526,7 +607,8 @@ bool Segment::merge(std::map<int, std::vector<int> > &clusterMembers, std::vecto
     if (mergeTo[bestMerge[k]] == k) {
       continue;
     }
-    
+
+    // 2 clusters that want to merge into each other
     if (bestMerge[k] == bestMerge[bestMerge[k]]) {
       if (k < bestMerge[k]) {
 	continue;
@@ -543,13 +625,7 @@ bool Segment::merge(std::map<int, std::vector<int> > &clusterMembers, std::vecto
       mergeTo[k] = mergeTo[bestMerge[k]];
     }
   }
-
-  for(unsigned int k=0; k<bestMerge.size(); ++k) {
-    if ( bestScore[k] < MERGE_THRESH) {
-
-    }
-  }
-
+  
   for(unsigned int k=0; k<indices.size(); ++k) {
     if (clusterMembers.count(k) > 0 && clusterMembers[k].size() == 0) {
       clusters -= clusterMembers.erase(k);

@@ -29,9 +29,7 @@ int main(int argc, char** argv) {
   segment.computeDensity();
   segment.findWalls();
 
-  segment.densityMap(segment.density, "density_map");
-  segment.binaryMap(segment.walls, "wall_map");
-  segment.binaryMap(segment.freeSpace, "freespace_map");
+  segment.findManhattanDirections();
 
   if (OPEN_FREESPACE) {
       segment.open(segment.freeSpace);

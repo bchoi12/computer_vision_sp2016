@@ -11,7 +11,7 @@
 #define SUBSAMPLE_STEP 3
 #define VISIBILITY_BUFFER 2
 #define MERGE_THRESH 0.6
-#define NUM_CLUSTERS 200
+#define NUM_CLUSTERS 50
 #define KMEDOIDS_LIMIT 20
 
 #define DEBUG 1
@@ -25,11 +25,13 @@ class Segment {
   std::vector<float> vx, vy, vz;
   unsigned int vertices, faces, edges;
   unsigned int width, height; // mask width, height
-
+  float mainAngle, perpAngle;
+  
   Segment(char* filename, unsigned int width = MASK_WIDTH);
   
   void computeDensity();
   void findWalls(float threshold = WALL_THRESH);
+  void findManhattanDirections();
   
   void densityMap(std::vector< std::vector<int> > &map, std::string outputName);
   void binaryMap(std::vector< std::vector<bool> > &map, std::string outputName);
