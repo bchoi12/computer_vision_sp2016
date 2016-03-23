@@ -74,6 +74,30 @@ void Segment::findWalls(float threshold) {
     }
   }
 
+  // clean up free space
+  for(unsigned int i=0; i<freeSpace.size(); ++i) {
+    for(unsigned int j=0; j<freeSpace[i].size(); ++j) {
+      if (freeSpace[i][j] == 0) {
+	continue;
+      }
+      for(int x = i-2; x<=i+2; ++x) {
+	if (freeSpace[i][j] == 0) {
+	  continue;
+	}
+	for(int y=j-2; y<=j+2; ++y) {
+	  if (x < 0 || y < 0 || x >= freeSpace.size() || y >= freeSpace[i].size()) {
+	    continue;
+	  }
+
+	  if (walls[x][y]) {
+	    freeSpace[i][j] = 0;
+	    continue;
+	  }
+	}
+      }
+    }
+  }
+
   binaryMap(walls, "wall_map");
   binaryMap(freeSpace, "freespace_map");
 }
