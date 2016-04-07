@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 2.8)
+project( polygon )
+find_package( OpenCV REQUIRED )
+include_directories( MRF )
+add_executable( polygon main.cpp )
+target_link_libraries( polygon ${OpenCV_LIBS} )
+target_link_libraries( polygon libMRF.a )
