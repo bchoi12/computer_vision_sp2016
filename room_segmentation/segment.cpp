@@ -74,6 +74,7 @@ void Segment::findWalls(float threshold) {
     }
   }
 
+  /*
   // clean up free space
   for(unsigned int i=0; i<freeSpace.size(); ++i) {
     for(unsigned int j=0; j<freeSpace[i].size(); ++j) {
@@ -97,6 +98,7 @@ void Segment::findWalls(float threshold) {
       }
     }
   }
+  */
 
   binaryMap(walls, "wall_map");
   binaryMap(freeSpace, "freespace_map");

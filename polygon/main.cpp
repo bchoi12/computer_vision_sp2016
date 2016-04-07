@@ -121,7 +121,7 @@ int main(int argc, char** argv) {
     for(int i=0; i<rows; ++i) {
       int pix = i*cols + j;
       for(int l=0; l<numLabels; ++l) {
-	D[pix*numLabels + l] = (MRF::CostVal) (l == rot_freespace.at<uchar>(i, j) ? 0 : 15);
+	D[pix*numLabels + l] = (MRF::CostVal) (l == rot_freespace.at<uchar>(i, j) ? 0 : 30);
       }
     }
   }
