@@ -1,4 +1,5 @@
 
+#include <string>
 #include <vector>
 
 
@@ -8,10 +9,16 @@
 void rotate(cv::Mat& src, double angle, cv::Mat& dst, bool thresh = true);
 
 int main(int argc, char** argv) {
-  cv::Mat walls_img = cv::imread("../walls.ppm");
-  cv::Mat freespace_img = cv::imread("../freespace.ppm");
-  cv::Mat density_img = cv::imread("../density.ppm");
-  cv::Mat walls_gray = cv::imread("../walls.ppm", CV_LOAD_IMAGE_GRAYSCALE);
+
+  std::string name = "";
+  if (argc > 1) {
+    name = "_" + std::string(argv[1]);
+  }
+  
+  cv::Mat walls_img = cv::imread("walls" + name + ".ppm");
+  cv::Mat freespace_img = cv::imread("freespace" + name + ".ppm");
+  cv::Mat density_img = cv::imread("density" + name + ".ppm");
+  cv::Mat walls_gray = cv::imread("walls" + name + ".ppm", CV_LOAD_IMAGE_GRAYSCALE);
   
   std::vector<cv::Vec4i> lines;
   cv::HoughLinesP(walls_gray, lines, 1, CV_PI/180, 10, 5, 3);
@@ -59,9 +66,9 @@ int main(int argc, char** argv) {
   rotate(freespace_img, -mainAngle*180/CV_PI, rot_freespace);
   rotate(density_img, -mainAngle*180/CV_PI, rot_density, false);
   
-  cv::imwrite("../density_rotated.png", rot_density);
-  cv::imwrite("../freespace_rotated.png", rot_freespace);
-  cv::imwrite("../walls_rotated.png", rot_walls);
+  cv::imwrite("density" + name + "_rotated.png", rot_density);
+  cv::imwrite("freespace" + name + "_rotated.png", rot_freespace);
+  cv::imwrite("walls" + name + "_rotated.png", rot_walls);
   
   printf("Rows: %d\nCols: %d\n", rot_freespace.rows, rot_freespace.cols);
 }

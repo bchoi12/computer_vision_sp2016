@@ -1,6 +1,7 @@
 
 #include <fstream>
 #include <iostream>
+#include <string>
 #include <vector>
 
 #include "opencv2/highgui.hpp"
@@ -12,7 +13,6 @@
 
 void split(const std::string &s, std::vector<std::string> &elems);
 void writePPM(cv::Mat &map, std::string outputName, int mapMax = 1);
-void rotate(cv::Mat& src, double angle, cv::Mat& dst);
 
 int main(int argc, char** argv) {
 
@@ -26,6 +26,12 @@ int main(int argc, char** argv) {
   
   if (argc > 2) {
     width = atoi(argv[2]);
+  }
+
+  std::string name = "";
+  
+  if (argc > 3) {
+    name = "_" + std::string(argv[3]);
   }
   
   int vertices = 0, faces = 0, edges = 0;
@@ -89,7 +95,7 @@ int main(int argc, char** argv) {
     maxDensity = std::max((int) density.at<int>(xindex, yindex), maxDensity);
   }
 
-  writePPM(density, "../density", maxDensity);
+  writePPM(density, "density" + name, maxDensity);
 
   cv::Mat walls = cv::Mat_<bool>(height, width);
   cv::Mat freespace = cv::Mat_<bool>(height, width);
@@ -101,8 +107,8 @@ int main(int argc, char** argv) {
     }
   }
 
-  writePPM(walls, "../walls");
-  writePPM(freespace, "../freespace");
+  writePPM(walls, "walls" + name);
+  writePPM(freespace, "freespace" + name);
 }
 
 void split(const std::string &s, std::vector<std::string> &elems) {

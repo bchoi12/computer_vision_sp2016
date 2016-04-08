@@ -11,6 +11,8 @@ fstream
 -
 iostream
 -
+string
+-
 vector
 -
 opencv2/highgui.hpp

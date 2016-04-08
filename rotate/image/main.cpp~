@@ -1,6 +1,7 @@
 
 #include <fstream>
 #include <iostream>
+#include <string>
 #include <vector>
 
 #include "opencv2/highgui.hpp"
@@ -12,7 +13,6 @@
 
 void split(const std::string &s, std::vector<std::string> &elems);
 void writePPM(cv::Mat &map, std::string outputName, int mapMax = 1);
-void rotate(cv::Mat& src, double angle, cv::Mat& dst);
 
 int main(int argc, char** argv) {
 
@@ -26,6 +26,12 @@ int main(int argc, char** argv) {
   
   if (argc > 2) {
     width = atoi(argv[2]);
+  }
+
+  std::string name = "";
+  
+  if (argc > 3) {
+    name = "_" + std::string(argv[3]);
   }
   
   int vertices = 0, faces = 0, edges = 0;
@@ -89,7 +95,7 @@ int main(int argc, char** argv) {
     maxDensity = std::max((int) density.at<int>(xindex, yindex), maxDensity);
   }
 
-  writePPM(density, "density_map", maxDensity);
+  writePPM(density, "../density" + name, maxDensity);
 
   cv::Mat walls = cv::Mat_<bool>(height, width);
   cv::Mat freespace = cv::Mat_<bool>(height, width);
@@ -101,73 +107,8 @@ int main(int argc, char** argv) {
     }
   }
 
-  writePPM(walls, "walls");
-  writePPM(freespace, "freespace");
-
-  cv::Mat walls_img = cv::imread("walls.ppm");
-  
-  return 1;
-  
-  cv::Mat walls_img;// = cv::imread("walls.ppm");
-  cv::Mat walls_gray = cv::imread("walls.ppm", CV_LOAD_IMAGE_GRAYSCALE);
-  cv::Mat freespace_img;// = cv::imread("freespace.ppm");
-
-  std::vector<cv::Vec4i> lines;
-  cv::HoughLinesP(walls_gray, lines, 1, CV_PI/180, 10, 5, 3);
-
-  cv::imshow("walls_gray", walls_gray);
-
-  printf("\n##hough##\n\n");
-  
-  std::vector<float> angles(lines.size());
-  float avgAngle = 0;
-  for(unsigned int i=0; i<lines.size(); ++i) {
-    float x = lines[i][3] - lines[i][1];
-    float y = lines[i][2] - lines[i][0];
-    angles[i] = abs(x) < 1e-6 ? CV_PI/2 : atan(y/x);
-
-    //printf("%d: %f\n", i, angles[i]);
-    
-    avgAngle += angles[i];
-  }
-
-  avgAngle /= angles.size();
-
-  float mainAngle = 0, perpAngle = 0;
-  int numMain = 0, numPerp = 0;
-
-  for(unsigned int i=0; i<angles.size(); ++i) {
-    if (angles[i] > avgAngle) {
-      mainAngle += angles[i];
-      numMain++;
-    } else {
-      perpAngle += angles[i];
-      numPerp++;
-    }
-  }
-
-  if (numMain >= numPerp) {
-    mainAngle /= numMain;
-    perpAngle = mainAngle - CV_PI/2;
-  } else {
-    perpAngle /= numPerp;
-    mainAngle = perpAngle;
-    perpAngle = mainAngle - CV_PI/2;
-  }
-  
-  printf("\n##rotate##\n\n");
-
-  printf("Main angle: %f\nPerp angle: %f\n", mainAngle, perpAngle);
-  
-  cv::Mat rot_walls, rot_freespace;
-  rotate(walls_img, -mainAngle*180/CV_PI, rot_walls);
-  rotate(freespace_img, -mainAngle*180/CV_PI, rot_freespace);
-  
-  printf("Rows: %d\nCols: %d\n", rot_freespace.rows, rot_freespace.cols);
-
-  cv::imshow("asdf", rot_freespace);
-  cv::waitKey(0);
-  
+  writePPM(walls, "../walls" + name);
+  writePPM(freespace, "../freespace" + name);
 }
 
 void split(const std::string &s, std::vector<std::string> &elems) {
@@ -201,22 +142,4 @@ void writePPM(cv::Mat& map, std::string outputName, int mapMax) {
   }
 
   fclose(fp);
-}
-
-void rotate(cv::Mat& src, double angle, cv::Mat& dst)
-{
-  int len = std::sqrt(src.cols*src.cols + src.rows*src.rows);
-
-  dst = cv::Mat(cv::Size(len, len), src.type());
-
-  cv::Mat t = (cv::Mat_<double>(2, 3) << 1, 0, (len-src.cols)/2, 0, 1, (len-src.rows)/2);
-  cv::warpAffine(src, dst, t, dst.size());
-
-  cv::Point2f pt(len/2., len/2.);
-  cv::Mat r = cv::getRotationMatrix2D(pt, angle, 1.0);
-
-  cv::warpAffine(dst, dst, r, dst.size());
-
-  cv::cvtColor(dst, dst, CV_BGR2GRAY);
-  cv::threshold(dst, dst, 100, 255, cv::THRESH_BINARY);
 }
