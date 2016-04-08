@@ -56,7 +56,7 @@ int main(int argc, char** argv) {
   } else {
     perpAngle /= numPerp;
     mainAngle = perpAngle;
-    perpAngle = mainAngle - CV_PI/2;
+    perpAngle = mainAngle + CV_PI/2;
   }
 
   printf("Main angle: %f\nPerp angle: %f\n", mainAngle, perpAngle);

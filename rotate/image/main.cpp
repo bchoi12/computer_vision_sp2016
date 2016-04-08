@@ -59,6 +59,8 @@ int main(int argc, char** argv) {
     }
     while(line != END_HEADER);
 
+    printf("Found %i vertices\n", vertices);
+
     vx.resize(vertices);
     vy.resize(vertices);
     vz.resize(vertices);
@@ -84,17 +86,27 @@ int main(int argc, char** argv) {
 
   int height = width * (ymax - ymin) / (xmax - xmin);
 
+  printf("Width: %i\nHeight: %i\n", width, height);
+  printf("xmin: %f\txmax: %f\nymin: %f\tymax: %f\n", xmin, xmax, ymin, ymax);
+
+  int a = 0, b = 0;
+  
   int maxDensity = 0;
   cv::Mat density = cv::Mat_<int>(height, width);
+
+  density *= 0;
+  
   for(unsigned int i=0; i<vx.size(); ++i) {
     int xindex, yindex;
-    xindex = std::min((int) ((vx[i] - xmin) / (xmax - xmin) * width), (int) width-1);
-    yindex = std::min((int) ((vy[i] - ymin) / (ymax - ymin) * height), (int) height-1);
+    xindex = std::min((int) (width * (vx[i] - xmin) / (xmax - xmin)), (int) width-1);
+    yindex = std::min((int) (height * (vy[i] - ymin) / (ymax - ymin)), (int) height-1);
 
-    density.at<int>(yindex, xindex)++;
-    maxDensity = std::max((int) density.at<int>(xindex, yindex), maxDensity);
+    int curDensity = density.at<int>(yindex, xindex)++;
+    maxDensity = std::max(curDensity, maxDensity);
   }
 
+  printf("Max density: %i\n", maxDensity);
+  
   writePPM(density, "density" + name, maxDensity);
 
   cv::Mat walls = cv::Mat_<bool>(height, width);
@@ -109,6 +121,8 @@ int main(int argc, char** argv) {
 
   writePPM(walls, "walls" + name);
   writePPM(freespace, "freespace" + name);
+
+  printf("Wrote images!\n");
 }
 
 void split(const std::string &s, std::vector<std::string> &elems) {
