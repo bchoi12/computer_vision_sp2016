@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 2.8)
+project( rotate )
+find_package( OpenCV REQUIRED )
+add_executable( rotate main.cpp )
+target_link_libraries( rotate ${OpenCV_LIBS} )
