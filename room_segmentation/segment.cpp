@@ -62,15 +62,18 @@ void Segment::computeDensity() {
 void Segment::findWalls(float threshold) {
   walls.resize(density.size());
   freeSpace.resize(density.size());
+  freeSpaceProb.resize(density.size());
   for(unsigned int i=0; i<walls.size(); ++i) {
     walls[i].resize(density[i].size());
     freeSpace[i].resize(density[i].size());
+    freeSpaceProb[i].resize(density[i].size());
   }
 
   for(unsigned int i=0; i<walls.size(); ++i) {
     for(unsigned int j=0; j<walls[i].size(); ++j) {
       walls[i][j] = density[i][j] > threshold * maxDensity;
       freeSpace[i][j] = density[i][j] == 0 ? false : !walls[i][j];
+      freeSpaceProb[i][j] = density[i][j] == 0 ? 0 : walls[i][j] ? 0 : threshold*maxDensity - density[i][j];
     }
   }
 
@@ -100,8 +103,10 @@ void Segment::findWalls(float threshold) {
   }
   */
 
+  
   binaryMap(walls, "wall_map");
   binaryMap(freeSpace, "freespace_map");
+  densityMap(freeSpaceProb, "freespaceprob_map");
 }
 
 void Segment::findManhattanDirections() {
@@ -189,7 +194,7 @@ void Segment::densityMap(std::vector< std::vector<int> > &map, std::string outpu
       mapMax = std::max(mapMax, map[i][j]);
     }
   }
-
+  
   outputName += ".ppm";
   
   FILE *fp = fopen(outputName.c_str(), "wb");

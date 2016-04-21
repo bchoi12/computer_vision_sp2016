@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 2.8)
+project( segment )
+find_package( OpenCV REQUIRED )
+add_executable( segment main.cpp segment.cpp )
+target_link_libraries( segment ${OpenCV_LIBS} )

@@ -1,0 +1,93 @@
+#include <stdio.h>
+#include <stdlib.h>
+
+#include <iostream>
+
+#include "opencv2/highgui.hpp"
+#include "opencv2/imgproc.hpp"
+
+#include "MRF/mrf.h"
+#include "MRF/GCoptimization.h"
+
+#define LABEL_COST 20
+#define EDGE_COST 50
+ 
+int main(int argc, char** argv) {
+  using namespace cv;
+
+  std::string name = "";
+  if (argc > 1) {
+    name = "_" + std::string(argv[1]);
+  }
+
+  Mat rot_freespace = imread("freespace" + name + "_rotated.png", CV_LOAD_IMAGE_GRAYSCALE);
+
+  for(int i=0; i<rot_freespace.rows; ++i) {
+    for(int j=0; j<rot_freespace.cols; ++j) {
+      rot_freespace.at<uchar>(i, j) = rot_freespace.at<uchar>(i, j) > 0 ? 1 : 0;
+    }
+  }
+
+
+  int numLabels = 2;
+  int rows = rot_freespace.cols, cols = rot_freespace.cols;
+  MRF::CostVal D[rows*cols*numLabels];
+  MRF::CostVal V[numLabels * numLabels];
+  MRF::CostVal* ptr;
+
+  for(int j=0; j<cols; ++j) {
+    for(int i=0; i<rows; ++i) {
+      int pix = i*cols + j;
+      for(int l=0; l<numLabels; ++l) {
+	D[pix*numLabels + l] = (MRF::CostVal) (l == rot_freespace.at<uchar>(i, j) ? 0 : LABEL_COST);
+      }
+    }
+  }
+
+  for(int i=0; i<numLabels; ++i) {
+    for(int j=i; j<numLabels; ++j) {
+      V[i*numLabels+j] = V[j*numLabels+i] = (i == j) ? 0 : (MRF::CostVal) EDGE_COST; 
+    }
+  }
+
+  DataCost *data = new DataCost(D);
+  SmoothnessCost *smooth = new SmoothnessCost(V);
+  EnergyFunction *energy = new EnergyFunction(data, smooth);
+
+  MRF* mrf = new Expansion(rows, cols, numLabels, energy);
+  mrf->initialize();
+  mrf->clearAnswer();
+
+  printf("Energy at the Start= %g (%g,%g)\n", (float)mrf->totalEnergy(),
+	 (float)mrf->smoothnessEnergy(), (float)mrf->dataEnergy());
+
+  float tot_t = 0, t;
+  for (int iter=0; iter<6; iter++) {
+    mrf->optimize(1, t);
+    
+    tot_t = tot_t + t ;
+    printf("energy = %g (%f secs)\n", (float)mrf->totalEnergy(), tot_t);
+  }
+  
+  FILE *fp = fopen(("freespace" + name + "_out.ppm").c_str(), "wb");
+  fprintf(fp, "P6\n%d %d\n255\n", rows, cols);
+  for(int pix=0; pix<rows*cols; ++pix) {
+    static unsigned char color[3];
+    color[0] = mrf->getLabel(pix) == 1 ? 255 : 0;
+    color[1] = color[0];
+    color[2] = color[0];
+    fwrite(color, 1, 3, fp);
+  }
+
+  fclose(fp);
+
+  Mat output(rows, cols, CV_8U);
+  for(int pix=0; pix<rows*cols; ++pix) {
+    output.at<unsigned char>(pix/cols, pix%cols) = mrf->getLabel(pix) == 1 ? 255 : 0;
+  }
+  
+  imwrite("freespace" + name + "_out.png", output);
+  
+  delete mrf;
+}
+

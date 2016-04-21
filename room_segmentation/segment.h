@@ -20,6 +20,7 @@ class Segment {
  public:
   std::vector< std::pair<int, int> > wallIndices, freeIndices; // subsampled indices of walls/free space
   std::vector< std::vector<int> > density;
+  std::vector< std::vector<float> > freeSpaceProb;
   std::vector< std::vector<bool> > walls, freeSpace;
   std::vector< std::vector<float> > visibilityVectors;
   std::vector<float> vx, vy, vz;
