@@ -9,8 +9,8 @@
 #include "MRF/mrf.h"
 #include "MRF/GCoptimization.h"
 
-#define LABEL_COST 20
-#define EDGE_COST 50
+#define LABEL_COST 1
+#define EDGE_COST 20
  
 int main(int argc, char** argv) {
   using namespace cv;

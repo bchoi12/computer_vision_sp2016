@@ -1,6 +1,0 @@
-cmake_minimum_required(VERSION 2.8)
-project( image )
-find_package( OpenCV REQUIRED )
-add_executable( rpca main.cpp )
-target_link_libraries( rpca ${OpenCV_LIBS} )
-add_definitions("-std=c++11") 

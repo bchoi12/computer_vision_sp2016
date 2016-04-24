@@ -13,5 +13,3 @@ cd ..
 cp rpca/rpca_freespace_$2_out.png freespace_$2_out.png
 
 ./segment/segment $2
-
-convert cluster_map_$2.ppm cluster_map_$2.png
