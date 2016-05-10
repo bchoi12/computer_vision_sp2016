@@ -6,4 +6,4 @@ Segmentation Pipeline
 4. rpca - uses robust PCA to make the freespace image more "blocky," outputs a "blocky" freespace image
 5. segment - uses the image from rpca and an image of the walls to apply the room segmentation algorithm, outputs a cluster map of room segmentation results.
 
-
+use go.sh to run the entire pipeline
