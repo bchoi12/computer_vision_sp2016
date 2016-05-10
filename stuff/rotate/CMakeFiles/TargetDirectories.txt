@@ -1,1 +1,0 @@
-/home/vision/Desktop/cv/2016spring/rotate/rotate/CMakeFiles/rotate.dir
