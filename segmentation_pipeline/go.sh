@@ -29,5 +29,5 @@ cp rpca/$2_freespace_rpca.png $2_freespace_rpca.png
 
 convert $2_cluster_map.ppm $2_cluster_map.png
 
-mv *.png $2_output/
-mv *.ppm $2_output/
+mv $2_*.png $2_output/
+mv $2_*.ppm $2_output/
